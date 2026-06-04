@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>LocalChat</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#08090f;--panel:#0f1019;--card:#161724;--border:#22233a;
+  --cyan:#00e8c6;--pink:#ff4f7b;--gold:#ffd166;
+  --text:#eeeef6;--muted:#585870;
+  --sent:#0d2f2b;--sent-b:#00e8c633;--recv:#161724;--recv-b:#22233a;
+  --radius:20px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Sora',sans-serif}
+button{font-family:'Sora',sans-serif;cursor:pointer}
+input,textarea{font-family:'Sora',sans-serif}
+
+/* scrollbar */
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ── SCREENS ── */
+.screen{display:none;position:fixed;inset:0;overflow-y:auto}
+.screen.active{display:flex;flex-direction:column}
+
+/* ════════ JOIN SCREEN ════════ */
+#s-join{align-items:center;justify-content:center;padding:20px}
+.join-wrap{width:100%;max-width:420px;animation:fadeUp .45s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+.brand-row{display:flex;align-items:center;gap:14px;margin-bottom:4px}
+.logo-box{
+  width:50px;height:50px;border-radius:16px;
+  background:linear-gradient(135deg,var(--cyan),#009e88);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 24px var(--cyan)44;
+  user-select:none;-webkit-user-select:none;
+}
+.brand-name{font-size:26px;font-weight:800;letter-spacing:-.5px}
+.brand-name b{color:var(--cyan)}
+.tagline{color:var(--muted);font-size:12.5px;margin-bottom:30px;margin-left:2px}
+
+.card{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:32px 28px;margin-bottom:12px}
+.field{margin-bottom:18px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:7px}
+.inp{
+  width:100%;background:var(--card);border:1.5px solid var(--border);
+  border-radius:14px;padding:13px 16px;color:var(--text);font-size:15px;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+}
+.inp:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan)14}
+.inp.code{font-size:26px;font-weight:700;letter-spacing:8px;text-align:center;color:var(--cyan)}
+.hint{color:var(--muted);font-size:11.5px;margin-top:5px;text-align:center}
+
+.err{background:var(--pink)18;border:1px solid var(--pink)44;border-radius:12px;padding:10px 14px;color:var(--pink);font-size:13.5px;text-align:center;margin-bottom:14px;display:none}
+
+.btn-primary{
+  width:100%;background:linear-gradient(135deg,var(--cyan),#00a88e);
+  color:#000;border:none;border-radius:15px;padding:15px;
+  font-size:15.5px;font-weight:700;letter-spacing:.3px;
+  transition:transform .12s,opacity .2s;
+}
+.btn-primary:active{transform:scale(.97)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+
+.info-bar{display:flex;gap:9px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-top:10px}
+.info-bar span{font-size:16px;flex-shrink:0}
+.info-bar p{color:var(--muted);font-size:12px;line-height:1.65}
+.info-bar strong{color:var(--cyan)}
+
+/* ════════ CHAT SCREEN ════════ */
+#s-chat{overflow:hidden}
+
+.chat-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;background:var(--panel);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+  position:relative;
+}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.room-pill{background:var(--cyan)1a;color:var(--cyan);border:1px solid var(--cyan)33;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;letter-spacing:1px}
+.hdr-title{font-size:14.5px;font-weight:700}
+.hdr-sub{color:var(--muted);font-size:11.5px;margin-top:1px}
+.online-dot{display:inline-block;width:7px;height:7px;background:#22cc88;border-radius:50%;margin-right:4px;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.leave-btn{background:var(--pink)1a;color:var(--pink);border:1px solid var(--pink)33;border-radius:10px;padding:7px 13px;font-size:12.5px;font-weight:600}
+
+.msg-area{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:8px}
+
+.empty-chat{margin:auto;text-align:center;color:var(--muted)}
+.empty-chat .e-icon{font-size:44px;margin-bottom:10px}
+.empty-chat p{font-size:14px;line-height:1.8}
+
+/* messages */
+.mrow{display:flex;align-items:flex-end;gap:7px}
+.mrow.me{flex-direction:row-reverse}
+.av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;background:var(--pink)22;color:var(--pink)}
+.av.me{background:var(--cyan)22;color:var(--cyan)}
+.mcol{max-width:74%}
+.sname{color:var(--muted);font-size:10.5px;margin-bottom:2px;padding-left:3px}
+.bubble{
+  padding:9px 13px;font-size:14.5px;line-height:1.55;
+  word-break:break-word;border:1px solid;
+  animation:pop .18s ease both;
+}
+@keyframes pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+.bubble.recv{background:var(--recv);border-color:var(--recv-b);border-radius:16px 16px 16px 3px}
+.bubble.sent{background:var(--sent);border-color:var(--sent-b);border-radius:16px 16px 3px 16px}
+.bubble img{max-width:100%;border-radius:10px;display:block;max-height:260px;object-fit:cover;cursor:pointer}
+.mtime{color:var(--muted);font-size:10px;margin-top:3px;padding:0 3px}
+.mrow.me .mtime{text-align:right}
+
+/* typing */
+.typing-row{display:flex;align-items:center;gap:8px;padding:2px 0}
+.tdots span{display:inline-block;width:5px;height:5px;background:var(--muted);border-radius:50%;animation:td .9s infinite}
+.tdots span:nth-child(2){animation-delay:.15s}
+.tdots span:nth-child(3){animation-delay:.3s}
+@keyframes td{0%,60%,100%{transform:none}30%{transform:translateY(-5px)}}
+
+/* input bar */
+.input-bar{
+  display:flex;align-items:flex-end;gap:8px;
+  padding:10px 12px;border-top:1px solid var(--border);
+  background:var(--panel);flex-shrink:0;
+}
+.attach-btn{width:40px;height:40px;border-radius:12px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color .2s}
+.attach-btn:hover{border-color:var(--cyan)}
+.emoji-btn{width:40px;height:40px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.txt-inp{
+  flex:1;background:var(--card);border:1.5px solid var(--border);
+  border-radius:14px;padding:10px 14px;color:var(--text);font-size:14.5px;
+  outline:none;resize:none;line-height:1.4;max-height:110px;overflow-y:auto;
+  transition:border-color .2s;
+}
+.txt-inp:focus{border-color:var(--cyan)}
+.send-btn{
+  width:44px;height:44px;border-radius:13px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--cyan),#00a88e);
+  border:none;display:flex;align-items:center;justify-content:center;
+  transition:opacity .2s,transform .12s;
+}
+.send-btn:active{transform:scale(.9)}
+.send-btn:disabled{opacity:.3;cursor:not-allowed}
+
+/* emoji picker */
+.emoji-picker{
+  position:fixed;bottom:70px;left:12px;right:12px;
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:18px;padding:14px;
+  display:none;flex-wrap:wrap;gap:6px;
+  max-height:220px;overflow-y:auto;z-index:100;
+  box-shadow:0 -8px 40px #00000088;
+}
+.emoji-picker.show{display:flex}
+.ep-emoji{font-size:24px;cursor:pointer;padding:4px;border-radius:8px;transition:background .15s}
+.ep-emoji:hover{background:var(--card)}
+
+/* image preview overlay */
+.img-overlay{
+  display:none;position:fixed;inset:0;background:#00000099;
+  z-index:200;align-items:center;justify-content:center;
+  padding:20px;
+}
+.img-overlay.show{display:flex}
+.img-overlay img{max-width:100%;max-height:90vh;border-radius:14px;object-fit:contain}
+.img-overlay .close-btn{position:absolute;top:16px;right:16px;width:36px;height:36px;background:var(--pink)22;color:var(--pink);border:1px solid var(--pink)44;border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center}
+
+/* ════════ ADMIN SCREEN ════════ */
+#s-admin{align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.admin-wrap{width:100%;max-width:480px}
+.admin-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.admin-title{font-size:20px;font-weight:800;color:var(--gold)}
+.admin-title span{font-size:14px;font-weight:400;color:var(--muted);margin-left:8px}
+.back-btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600}
+
+/* admin login */
+.admin-login-card{background:var(--panel);border:1px solid var(--gold)33;border-radius:24px;padding:32px 28px;animation:fadeUp .4s ease both}
+.admin-lock{font-size:48px;text-align:center;margin-bottom:16px}
+.admin-login-card h2{text-align:center;font-size:18px;color:var(--gold);margin-bottom:6px}
+.admin-login-card p{text-align:center;color:var(--muted);font-size:13px;margin-bottom:24px}
+.admin-err{background:var(--pink)18;border:1px solid var(--pink)33;border-radius:10px;padding:9px 14px;color:var(--pink);font-size:13px;text-align:center;margin-bottom:14px;display:none}
+.btn-gold{width:100%;background:linear-gradient(135deg,var(--gold),#e6a800);color:#000;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;transition:transform .12s}
+.btn-gold:active{transform:scale(.97)}
+
+/* admin dashboard */
+.admin-dash{display:none}
+.stats-row{display:flex;gap:10px;margin-bottom:16px}
+.stat-card{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px;text-align:center}
+.stat-card .num{font-size:22px;font-weight:800;color:var(--cyan)}
+.stat-card .lbl{color:var(--muted);font-size:11px;margin-top:2px}
+
+.section-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+
+/* rooms list */
+.room-item{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:border-color .2s}
+.room-item:hover{border-color:var(--cyan)55}
+.room-code-lbl{font-size:16px;font-weight:700;color:var(--cyan)}
+.room-meta{color:var(--muted);font-size:12px;margin-top:2px}
+.del-room-btn{background:var(--pink)1a;color:var(--pink);border:1px solid var(--pink)33;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600}
+
+/* room messages view */
+.room-msgs-view{display:none}
+.msg-admin-item{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:7px}
+.msg-admin-sender{font-size:12px;font-weight:600;color:var(--cyan);margin-bottom:4px}
+.msg-admin-text{font-size:14px;color:var(--text);line-height:1.5}
+.msg-admin-time{font-size:11px;color:var(--muted);margin-top:4px}
+.msg-admin-img{max-width:160px;border-radius:8px;margin-top:6px;cursor:pointer}
+
+/* change credentials */
+.creds-section{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:20px;margin-top:14px}
+
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* toast */
+.toast{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:10px 18px;font-size:13px;
+  color:var(--text);display:none;z-index:300;white-space:nowrap;
+  box-shadow:0 4px 20px #00000066;
+}
+.toast.show{display:block;animation:toastIn .3s ease}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- ════════════════ JOIN SCREEN ════════════════ -->
+<div class="screen active" id="s-join">
+  <div class="join-wrap">
+    <div class="brand-row">
+      <div class="logo-box" id="logo-tap">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="black"/>
+          <circle cx="8" cy="11" r="1.3" fill="black"/>
+          <circle cx="12" cy="11" r="1.3" fill="black"/>
+          <circle cx="16" cy="11" r="1.3" fill="black"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">Secret<b>Chat</b></div>
+      </div>
+    </div>
+    <p class="tagline">Real-time chat · Text · Emoji · Photos ✦</p>
+
+    <div class="card">
+      <div class="field">
+        <label>👤 Tumhara Naam</label>
+        <input class="inp" id="inp-name" type="text" placeholder="Koi bhi naam..." maxlength="20" autocomplete="off"/>
+      </div>
+      <div class="field">
+        <label>🔑 6 Digit Room Code</label>
+        <input class="inp code" id="inp-code" type="tel" placeholder="······" maxlength="6" inputmode="numeric" autocomplete="off"/>
+        <span class="hint">Dono log same code daalo → same chat mein aao</span>
+      </div>
+      <div class="err" id="join-err"></div>
+      <button class="btn-primary" id="join-btn" onclick="joinRoom()">Chat Shuru Karo →</button>
+    </div>
+
+    <div class="info-bar">
+      <span>💡</span>
+      <p>Internet se chalta hai. <strong>Same 6-digit code</strong> daalo dono phones pe — real-time messages, photos, emoji sab!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ CHAT SCREEN ════════════════ -->
+<div class="screen" id="s-chat">
+  <div class="chat-hdr">
+    <div class="hdr-l">
+      <div class="room-pill" id="c-room">#000000</div>
+      <div>
+        <div class="hdr-title" id="c-title">Room</div>
+        <div class="hdr-sub" id="c-members"><span class="online-dot"></span>—</div>
+      </div>
+    </div>
+    <button class="leave-btn" onclick="leaveRoom()">✕ Niklo</button>
+  </div>
+
+  <div class="msg-area" id="msg-area">
+    <div class="empty-chat" id="empty-chat">
+      <div class="e-icon">💬</div>
+      <p>Koi message nahi abhi…<br/><small style="font-size:12px">Dusre phone pe same code daalo!</small></p>
+    </div>
+  </div>
+
+  <div class="emoji-picker" id="emoji-picker"></div>
+
+  <div class="input-bar">
+    <button class="attach-btn" onclick="document.getElementById('img-input').click()" title="Photo bhejo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#585870" stroke-width="2" stroke-linecap="round">
+        <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/>
+        <path d="M21 15l-5-5L5 21"/>
+      </svg>
+    </button>
+    <input type="file" id="img-input" accept="image/*" style="display:none" onchange="sendImage(this)"/>
+    <button class="emoji-btn" onclick="toggleEmojiPicker()" title="Emoji">😊</button>
+    <textarea class="txt-inp" id="txt-inp" placeholder="Message likho…" rows="1"
+      onkeydown="onKey(event)" oninput="onInput(this)"></textarea>
+    <button class="send-btn" id="send-btn" onclick="sendText()" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M22 2L11 13" stroke="black" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="black" stroke-width="2.5" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════ ADMIN SCREEN ════════════════ -->
+<div class="screen" id="s-admin">
+  <div class="admin-wrap">
+    <div class="admin-hdr">
+      <div class="admin-title">🛡️ Admin Panel</div>
+      <button class="back-btn" onclick="goHome()">← Wapas</button>
+    </div>
+
+    <!-- Login form -->
+    <div class="admin-login-card" id="admin-login">
+      <div class="admin-lock">🔐</div>
+      <h2>Admin Login</h2>
+      <p>Sirf authorized admin hi yahan aa sakte hain</p>
+      <div class="field">
+        <label>Username / Email</label>
+        <input class="inp" id="adm-user" type="email" placeholder="Email daalo..." autocomplete="off"/>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input class="inp" id="adm-pass" type="password" placeholder="Password daalo..." autocomplete="off"/>
+      </div>
+      <div class="admin-err" id="adm-err"></div>
+      <button class="btn-gold" onclick="adminLogin()">🔓 Login Karo</button>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="admin-dash" id="admin-dash">
+      <div class="stats-row">
+        <div class="stat-card"><div class="num" id="stat-msgs">—</div><div class="lbl">Total Messages</div></div>
+        <div class="stat-card"><div class="num" id="stat-rooms">—</div><div class="lbl">Active Rooms</div></div>
+      </div>
+
+      <!-- Rooms list -->
+      <div id="rooms-list-view">
+        <div class="section-title">💬 Saari Rooms</div>
+        <div id="rooms-list"></div>
+        <button class="btn-primary" style="margin-top:8px;padding:11px" onclick="loadRooms()">🔄 Refresh</button>
+      </div>
+
+      <!-- Room messages -->
+      <div class="room-msgs-view" id="room-msgs-view">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-weight:700;font-size:16px" id="rm-title">Room Messages</div>
+          <div style="display:flex;gap:8px">
+            <button class="del-room-btn" onclick="deleteRoomMsgs()">🗑️ Delete All</button>
+            <button class="back-btn" onclick="showRoomsList()">← Back</button>
+          </div>
+        </div>
+        <div id="room-msgs-list"></div>
+      </div>
+
+      <!-- Change credentials -->
+      <div class="creds-section">
+        <div class="section-title">🔑 Credentials Change Karo</div>
+        <div class="field">
+          <label>Naya Username/Email</label>
+          <input class="inp" id="new-user" type="email" placeholder="New email..."/>
+        </div>
+        <div class="field">
+          <label>Naya Password</label>
+          <input class="inp" id="new-pass" type="password" placeholder="New password..."/>
+        </div>
+        <button class="btn-gold" style="padding:12px" onclick="changeCreds()">💾 Save Changes</button>
+      </div>
+
+      <button class="leave-btn" style="width:100%;margin-top:12px;padding:12px;border-radius:12px;font-size:14px" onclick="adminLogout()">🚪 Logout</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image overlay -->
+<div class="img-overlay" id="img-overlay" onclick="this.classList.remove('show')">
+  <button class="close-btn">✕</button>
+  <img id="overlay-img" src="" alt=""/>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── SUPABASE CONFIG ──
+const SUPA_URL = "https://xkdbrsotvkuizojrshjg.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrZGJyc290dmt1aXpvanJzaGpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NTI5MzYsImV4cCI6MjA5NjEyODkzNn0.uRVL28uOl1UTA7zRrOJF76YITB0H7IeG6g-J3e7nugQ";
+
+const api = (path, opts={}) => fetch(SUPA_URL+"/rest/v1/"+path, {
+  headers:{"apikey":SUPA_KEY,"Authorization":"Bearer "+SUPA_KEY,"Content-Type":"application/json","Prefer":"return=representation",...(opts.headers||{})},
+  ...opts
+});
+const storageApi = (path, opts={}) => fetch(SUPA_URL+"/storage/v1/"+path, {
+  headers:{"apikey":SUPA_KEY,"Authorization":"Bearer "+SUPA_KEY,...(opts.headers||{})},
+  ...opts
+});
+
+// ── STATE ──
+let myName="", myId="", roomCode="", pollTimer=null, typingTimer=null, adminLoggedIn=false;
+let currentAdminRoom="";
+
+// ── LOGO TAP (4 taps → admin) ──
+let tapCount=0, tapTimer=null;
+document.getElementById("logo-tap").addEventListener("click",()=>{
+  tapCount++;
+  clearTimeout(tapTimer);
+  tapTimer=setTimeout(()=>tapCount=0,1500);
+  if(tapCount>=4){tapCount=0;openAdmin();}
+});
+
+// ── SCREENS ──
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+function goHome(){showScreen("s-join");}
+
+// ── JOIN ──
+async function joinRoom(){
+  const name=document.getElementById("inp-name").value.trim();
+  const code=document.getElementById("inp-code").value.trim();
+  if(!name){showErr("join-err","Naam likho! 👤");return;}
+  if(!/^\d{6}$/.test(code)){showErr("join-err","6 anko ka code chahiye! 🔑");return;}
+
+  const btn=document.getElementById("join-btn");
+  btn.disabled=true; btn.innerHTML='<div class="spinner"></div>';
+
+  myName=name; myId=Date.now()+"_"+Math.random().toString(36).slice(2,6); roomCode=code;
+
+  // register member
+  try{
+    await api("room_members",{method:"POST",body:JSON.stringify({room_code:code,user_id:myId,user_name:name})});
+  }catch(e){}
+
+  document.getElementById("c-room").textContent="#"+code;
+  document.getElementById("c-title").textContent="Room "+code;
+  showScreen("s-chat");
+  renderMessages([]);
+  startPolling();
+  loadMembers();
+  document.getElementById("txt-inp").focus();
+  btn.disabled=false; btn.innerHTML="Chat Shuru Karo →";
+}
+
+// ── POLLING ──
+let lastMsgId=null;
+function startPolling(){
+  if(pollTimer)clearInterval(pollTimer);
+  fetchMessages();
+  pollTimer=setInterval(fetchMessages,1200);
+  setInterval(loadMembers,5000);
+}
+
+async function fetchMessages(){
+  try{
+    const r=await api(`messages?room_code=eq.${roomCode}&order=created_at.asc&select=*`);
+    const msgs=await r.json();
+    renderMessages(msgs||[]);
+  }catch(e){}
+}
+
+async function loadMembers(){
+  // update presence
+  try{
+    await api(`room_members?room_code=eq.${roomCode}&user_id=eq.${myId}`,{
+      method:"PATCH",body:JSON.stringify({last_seen:new Date().toISOString()})
+    });
+    const r=await api(`room_members?room_code=eq.${roomCode}&select=user_name`);
+    const mems=await r.json();
+    if(mems&&mems.length){
+      document.getElementById("c-members").innerHTML=`<span class="online-dot"></span>${mems.map(m=>m.user_name).join(", ")}`;
+    }
+  }catch(e){}
+}
+
+// ── RENDER MESSAGES ──
+let renderedIds=new Set();
+function renderMessages(msgs){
+  const area=document.getElementById("msg-area");
+  const empty=document.getElementById("empty-chat");
+  if(!msgs.length){if(empty)empty.style.display="block";return;}
+  if(empty)empty.style.display="none";
+
+  // Only add new messages
+  msgs.forEach(msg=>{
+    if(renderedIds.has(msg.id))return;
+    renderedIds.add(msg.id);
+    const isMine=msg.sender_id===myId;
+    const row=document.createElement("div");
+    row.className="mrow"+(isMine?" me":"");
+    const timeStr=msg.created_at?new Date(msg.created_at).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}):"";
+
+    let content="";
+    if(msg.message_type==="image"&&msg.image_url){
+      content=`<img src="${escHtml(msg.image_url)}" alt="photo" onclick="openImgOverlay('${escHtml(msg.image_url)}')" class=""/>`;
+    } else {
+      content=escHtml(msg.content||"");
+    }
+
+    row.innerHTML=`
+      <div class="av ${isMine?"me":""}">${msg.sender_name[0].toUpperCase()}</div>
+      <div class="mcol">
+        ${!isMine?`<div class="sname">${escHtml(msg.sender_name)}</div>`:""}
+        <div class="bubble ${isMine?"sent":"recv"}">${content}</div>
+        <div class="mtime">${timeStr}</div>
+      </div>`;
+    area.appendChild(row);
+  });
+  area.scrollTop=area.scrollHeight;
+}
+
+// ── SEND TEXT ──
+async function sendText(){
+  const inp=document.getElementById("txt-inp");
+  const text=inp.value.trim();
+  if(!text)return;
+  inp.value=""; inp.style.height="auto";
+  document.getElementById("send-btn").disabled=true;
+
+  try{
+    await api("messages",{method:"POST",body:JSON.stringify({
+      room_code:roomCode,sender_name:myName,sender_id:myId,
+      message_type:"text",content:text
+    })});
+    fetchMessages();
+  }catch(e){showToast("Message nahi gaya 😕");}
+}
+
+// ── SEND IMAGE ──
+async function sendImage(input){
+  const file=input.files[0];
+  if(!file)return;
+  if(file.size>5*1024*1024){showToast("Image 5MB se choti honi chahiye!");return;}
+
+  showToast("Upload ho raha hai...");
+  const ext=file.name.split('.').pop();
+  const path=`${roomCode}/${Date.now()}.${ext}`;
+
+  try{
+    // Upload to storage
+    const upRes=await storageApi(`object/chat-images/${path}`,{
+      method:"POST",
+      headers:{"Content-Type":file.type},
+      body:file
+    });
+    if(!upRes.ok)throw new Error("Upload failed");
+
+    const imgUrl=`${SUPA_URL}/storage/v1/object/public/chat-images/${path}`;
+    await api("messages",{method:"POST",body:JSON.stringify({
+      room_code:roomCode,sender_name:myName,sender_id:myId,
+      message_type:"image",image_url:imgUrl,content:"[Photo]"
+    })});
+    fetchMessages();
+    showToast("Photo bhej diya! 📷");
+  }catch(e){showToast("Photo nahi gayi 😕");}
+  input.value="";
+}
+
+// ── EMOJI PICKER ──
+const EMOJIS=["😀","😂","😍","🥰","😎","😢","😭","😡","🤔","👍","👎","❤️","🔥","✅","🙏","👋","🎉","😅","🤣","💀","😏","🥺","😤","🫡","💯","🤝","✨","😊","🥳","😴","🫶","💪","😻","🤩","😬","🫠","😇","🤗","😋","😜"];
+const picker=document.getElementById("emoji-picker");
+EMOJIS.forEach(e=>{
+  const btn=document.createElement("span");
+  btn.className="ep-emoji"; btn.textContent=e;
+  btn.onclick=()=>{
+    const inp=document.getElementById("txt-inp");
+    inp.value+=e; inp.focus();
+    document.getElementById("send-btn").disabled=false;
+    picker.classList.remove("show");
+  };
+  picker.appendChild(btn);
+});
+function toggleEmojiPicker(){picker.classList.toggle("show");}
+document.addEventListener("click",e=>{
+  if(!picker.contains(e.target)&&!e.target.closest(".emoji-btn"))picker.classList.remove("show");
+});
+
+// ── INPUT HELPERS ──
+function onInput(el){
+  el.style.height="auto";
+  el.style.height=Math.min(el.scrollHeight,110)+"px";
+  document.getElementById("send-btn").disabled=!el.value.trim();
+}
+function onKey(e){
+  if(e.key==="Enter"&&!e.shiftKey&&window.innerWidth>600){e.preventDefault();sendText();}
+}
+
+// ── LEAVE ROOM ──
+async function leaveRoom(){
+  clearInterval(pollTimer);
+  try{await api(`room_members?room_code=eq.${roomCode}&user_id=eq.${myId}`,{method:"DELETE"});}catch(e){}
+  renderedIds.clear();
+  document.getElementById("msg-area").innerHTML=`<div class="empty-chat" id="empty-chat"><div class="e-icon">💬</div><p>Koi message nahi abhi…<br/><small>Dusre phone pe same code daalo!</small></p></div>`;
+  showScreen("s-join");
+}
+
+// ── IMAGE OVERLAY ──
+function openImgOverlay(url){
+  document.getElementById("overlay-img").src=url;
+  document.getElementById("img-overlay").classList.add("show");
+}
+
+// ═══════════════ ADMIN ═══════════════
+function openAdmin(){showScreen("s-admin");}
+
+async function adminLogin(){
+  const u=document.getElementById("adm-user").value.trim();
+  const p=document.getElementById("adm-pass").value.trim();
+  if(!u||!p){showAdmErr("Fields khali hain!");return;}
+
+  try{
+    const r=await api("admin_config?id=eq.1&select=username,password");
+    const data=await r.json();
+    if(!data||!data[0]){showAdmErr("Config nahi mili!");return;}
+    if(data[0].username===u&&data[0].password===p){
+      adminLoggedIn=true;
+      document.getElementById("admin-login").style.display="none";
+      document.getElementById("admin-dash").style.display="block";
+      loadRooms();
+    } else {
+      showAdmErr("Galat username ya password! ❌");
+    }
+  }catch(e){showAdmErr("Error: "+e.message);}
+}
+
+async function loadRooms(){
+  const list=document.getElementById("rooms-list");
+  list.innerHTML='<div class="spinner"></div>';
+  try{
+    const r=await api("messages?select=room_code&order=created_at.desc");
+    const msgs=await r.json();
+    // Count per room
+    const roomMap={};
+    (msgs||[]).forEach(m=>{
+      if(!roomMap[m.room_code])roomMap[m.room_code]=0;
+      roomMap[m.room_code]++;
+    });
+    const rooms=Object.entries(roomMap);
+    document.getElementById("stat-msgs").textContent=(msgs||[]).length;
+    document.getElementById("stat-rooms").textContent=rooms.length;
+
+    list.innerHTML="";
+    if(!rooms.length){list.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Koi room nahi hai abhi</p>';return;}
+    rooms.forEach(([code,count])=>{
+      const div=document.createElement("div");
+      div.className="room-item";
+      div.innerHTML=`
+        <div onclick="viewRoom('${code}')">
+          <div class="room-code-lbl">#${code}</div>
+          <div class="room-meta">${count} messages</div>
+        </div>
+        <button class="del-room-btn" onclick="deleteRoom('${code}')">🗑️ Delete</button>`;
+      list.appendChild(div);
+    });
+  }catch(e){list.innerHTML='<p style="color:var(--pink)">Error: '+e.message+'</p>';}
+}
+
+async function viewRoom(code){
+  currentAdminRoom=code;
+  document.getElementById("rooms-list-view").style.display="none";
+  document.getElementById("room-msgs-view").style.display="block";
+  document.getElementById("rm-title").textContent="Room #"+code;
+  const list=document.getElementById("room-msgs-list");
+  list.innerHTML='<div class="spinner"></div>';
+  try{
+    const r=await api(`messages?room_code=eq.${code}&order=created_at.asc&select=*`);
+    const msgs=await r.json();
+    list.innerHTML="";
+    if(!msgs||!msgs.length){list.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px">Koi message nahi</p>';return;}
+    msgs.forEach(msg=>{
+      const div=document.createElement("div");
+      div.className="msg-admin-item";
+      const timeStr=msg.created_at?new Date(msg.created_at).toLocaleString("en-IN"):"";
+      let content=msg.message_type==="image"&&msg.image_url
+        ?`<img src="${escHtml(msg.image_url)}" class="msg-admin-img" onclick="openImgOverlay('${escHtml(msg.image_url)}')" />`
+        :escHtml(msg.content||"");
+      div.innerHTML=`<div class="msg-admin-sender">👤 ${escHtml(msg.sender_name)}</div><div class="msg-admin-text">${content}</div><div class="msg-admin-time">🕐 ${timeStr}</div>`;
+      list.appendChild(div);
+    });
+  }catch(e){list.innerHTML='<p style="color:var(--pink)">Error: '+e.message+'</p>';}
+}
+
+function showRoomsList(){
+  document.getElementById("room-msgs-view").style.display="none";
+  document.getElementById("rooms-list-view").style.display="block";
+  loadRooms();
+}
+
+async function deleteRoom(code){
+  if(!confirm("Room #"+code+" ki saari messages delete karein?"))return;
+  try{
+    await api(`messages?room_code=eq.${code}`,{method:"DELETE"});
+    showToast("Room #"+code+" delete ho gayi ✅");
+    loadRooms();
+  }catch(e){showToast("Error: "+e.message);}
+}
+
+async function deleteRoomMsgs(){
+  if(!confirm("Is room ki saari messages delete karein?"))return;
+  try{
+    await api(`messages?room_code=eq.${currentAdminRoom}`,{method:"DELETE"});
+    showToast("Saari messages delete ho gayi ✅");
+    showRoomsList();
+  }catch(e){showToast("Error: "+e.message);}
+}
+
+async function changeCreds(){
+  const u=document.getElementById("new-user").value.trim();
+  const p=document.getElementById("new-pass").value.trim();
+  if(!u||!p){showToast("Dono fields bharo!");return;}
+  try{
+    await api("admin_config?id=eq.1",{method:"PATCH",body:JSON.stringify({username:u,password:p})});
+    showToast("Credentials save ho gaye ✅");
+    document.getElementById("new-user").value="";
+    document.getElementById("new-pass").value="";
+  }catch(e){showToast("Error: "+e.message);}
+}
+
+function adminLogout(){
+  adminLoggedIn=false;
+  document.getElementById("admin-login").style.display="block";
+  document.getElementById("admin-dash").style.display="none";
+  document.getElementById("adm-user").value="";
+  document.getElementById("adm-pass").value="";
+  goHome();
+}
+
+// ── UTILS ──
+function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.style.display="block";setTimeout(()=>el.style.display="none",3000);}
+function showAdmErr(msg){const el=document.getElementById("adm-err");el.textContent=msg;el.style.display="block";setTimeout(()=>el.style.display="none",3000);}
+function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br/>");}
+function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2500);}
+
+// Enter key on join
+document.getElementById("inp-name").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("inp-code").focus();});
+document.getElementById("inp-code").addEventListener("keydown",e=>{if(e.key==="Enter")joinRoom();});
+document.getElementById("inp-code").addEventListener("input",function(){this.value=this.value.replace(/\D/g,"").slice(0,6);});
+document.getElementById("adm-pass").addEventListener("keydown",e=>{if(e.key==="Enter")adminLogin();});
+</script>
+</body>
+</html>
