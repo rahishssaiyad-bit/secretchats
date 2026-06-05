@@ -472,9 +472,15 @@ async function joinRoom(){
 
   myName=name; myId=Date.now()+"_"+Math.random().toString(36).slice(2,6); roomCode=code;
 
+  try{
+    // Pehle stale/purane members saaf karo (5 min se zyada inactive)
+    const cutoff=new Date(Date.now()-5*60*1000).toISOString();
+    await api(`room_members?room_code=eq.${code}&last_seen=lt.${cutoff}`,{method:"DELETE"});
+  }catch(e){}
+
   // register member
   try{
-    await api("room_members",{method:"POST",body:JSON.stringify({room_code:code,user_id:myId,user_name:name})});
+    await api("room_members",{method:"POST",body:JSON.stringify({room_code:code,user_id:myId,user_name:name,last_seen:new Date().toISOString()})});
   }catch(e){}
 
   document.getElementById("c-room").textContent="#"+code;
@@ -518,11 +524,19 @@ async function checkIfLastUser(){
 }
 
 async function loadMembers(){
-  // update presence
+  // update my presence
   try{
     await api(`room_members?room_code=eq.${roomCode}&user_id=eq.${myId}`,{
       method:"PATCH",body:JSON.stringify({last_seen:new Date().toISOString()})
     });
+  }catch(e){}
+  // clean stale members (2 min inactive)
+  try{
+    const cutoff=new Date(Date.now()-2*60*1000).toISOString();
+    await api(`room_members?room_code=eq.${roomCode}&last_seen=lt.${cutoff}`,{method:"DELETE"});
+  }catch(e){}
+  // load active members
+  try{
     const r=await api(`room_members?room_code=eq.${roomCode}&select=user_name`);
     const mems=await r.json();
     if(mems&&mems.length){
@@ -710,17 +724,18 @@ async function leaveRoom(){
 }
 
 // ── DELETE ROOM (last user) ──
+// Sirf room_members delete hote hain — messages admin panel ke liye safe rehte hain
 async function deleteRoomAndLeave(){
-  if(!confirm("Room aur saari messages delete ho jaayengi. Sure ho?"))return;
+  if(!confirm("Room band ho jaayegi. Messages admin panel mein safe rahenge. Sure ho?"))return;
   clearInterval(pollTimer);
   try{
-    await api(`messages?room_code=eq.${roomCode}`,{method:"DELETE"});
+    // Sirf members delete karo — messages NAHI
     await api(`room_members?room_code=eq.${roomCode}`,{method:"DELETE"});
   }catch(e){}
   renderedIds.clear();
   document.getElementById("msg-area").innerHTML=`<div class="empty-chat" id="empty-chat"><div class="e-icon">💬</div><p>Koi message nahi abhi…<br/><small>Dusre phone pe same code daalo!</small></p></div>`;
   document.getElementById("delete-room-bar").style.display="none";
-  showToast("Room delete ho gayi ✅");
+  showToast("Room band ho gayi ✅");
   setTimeout(()=>showScreen("s-join"),1200);
 }
 
